@@ -52,7 +52,18 @@ jobs:
           cd "$PROJECT_DIR"
 
           npm install
-          npm install --save-dev typescript
+
+          # Reemplazar la configuración TypeScript por JSON
+          rm -f capacitor.config.ts capacitor.config.js capacitor.config.mjs
+
+          cat > capacitor.config.json <<'EOF'
+          {
+            "appId": "com.creaapps.studio",
+            "appName": "CreaApps",
+            "webDir": "dist",
+            "bundledWebRuntime": false
+          }
+          EOF
 
           npx cap add android
           npm run build
