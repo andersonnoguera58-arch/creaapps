@@ -1,0 +1,74 @@
+name: Compilar APK Android Corregido
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar el proyecto
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Configurar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Extraer y compilar CreaApps
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ZIP_FILE="$(find . -maxdepth 1 -type f -iname '*.zip' -print -quit)"
+          if [ -z "$ZIP_FILE" ]; then
+            echo "ERROR: No se encontró el ZIP en la raíz del repositorio."
+            exit 1
+          fi
+
+          mkdir -p extracted
+          unzip -oq "$ZIP_FILE" -d extracted
+
+          PACKAGE_FILE="$(find extracted -type f -name package.json -print -quit)"
+          if [ -z "$PACKAGE_FILE" ]; then
+            echo "ERROR: No se encontró package.json dentro del ZIP."
+            exit 1
+          fi
+
+          PROJECT_DIR="$(cd "$(dirname "$PACKAGE_FILE")" && pwd)"
+          cd "$PROJECT_DIR"
+
+          npm install
+          npm install --save-dev typescript
+
+          npx cap add android
+          npm run build
+          npx cap sync android
+
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+          mkdir -p "$GITHUB_WORKSPACE/apk-result"
+          cp app/build/outputs/apk/debug/app-debug.apk \
+            "$GITHUB_WORKSPACE/apk-result/CreaApps.apk"
+
+      - name: Guardar el APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: CreaApps-Android-APK
+          path: apk-result/CreaApps.apk
+          if-no-files-found: error
